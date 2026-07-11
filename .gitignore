@@ -1,6 +1,0 @@
-work_dirs/
-*.ckpt
-*.npy
-*.pth
-*.pt
-*.log
