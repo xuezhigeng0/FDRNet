@@ -220,4 +220,16 @@ dataset_parameters = {
         'data_name': 'vil', 
         'metrics': ['mse', 'mae', 'pod', 'sucr', 'csi', 'lpips'],
     },
+    'weather_tp_5_625': {
+        'in_shape': [12, 1, 32, 64],
+        'pre_seq_length': 12,
+        'aft_seq_length': 12,
+        'total_length': 24,
+        'data_name': 'tp',
+        'train_time': ['2010', '2015'],
+        'val_time': ['2016', '2016'],
+        'test_time': ['2017', '2018'],
+        'metrics': ['mse', 'rmse', 'mae', 'psnr', 'snr'],
+    },
+
 }

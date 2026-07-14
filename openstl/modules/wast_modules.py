@@ -3,8 +3,11 @@ import torch.nn as nn
 from einops import rearrange
 from functools import partial
 from itertools import accumulate
-from timm.layers import DropPath, activations
-from timm.models._efficientnet_blocks import SqueezeExcite, InvertedResidual
+from timm.models.layers import DropPath, activations
+try:
+    from timm.models._efficientnet_blocks import SqueezeExcite, InvertedResidual
+except ModuleNotFoundError:
+    from timm.models.efficientnet_blocks import SqueezeExcite, InvertedResidual
 
 # version adaptation for PyTorch > 1.7.1
 IS_HIGH_VERSION = tuple(map(int, torch.__version__.split('+')[0].split('.'))) > (1, 7, 1)
