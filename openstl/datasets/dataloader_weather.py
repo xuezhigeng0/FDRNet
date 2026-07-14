@@ -100,11 +100,14 @@ class WeatherBenchDataset(Dataset):
         self.idx_out = np.array(idx_out)
         self.step = step
         self.data = None
+        normalization_mean = mean
+        normalization_std = std
         self.mean = mean
         self.std = std
         self.transform_data = transform_data
         self.transform_labels = transform_labels
         self.use_augment = use_augment
+        self.data_name = data_name
 
         self.time = None
         self.time_size = self.training_time
@@ -135,6 +138,16 @@ class WeatherBenchDataset(Dataset):
         self.data = np.concatenate(self.data, axis=1)
         self.mean = np.concatenate(self.mean, axis=1)
         self.std = np.concatenate(self.std, axis=1)
+
+        if (normalization_mean is None) != (normalization_std is None):
+            raise ValueError('mean and std must either both be provided or both be None.')
+
+        if normalization_mean is not None:
+            # Restore the original values before applying training statistics.
+            self.data = self.data * self.std + self.mean
+            self.mean = np.asarray(normalization_mean)
+            self.std = np.asarray(normalization_std)
+            self.data = (self.data - self.mean) / self.std
 
         self.valid_idx = np.array(
             range(-idx_in[0], self.data.shape[0]-idx_out[-1]-1))
@@ -223,9 +236,23 @@ def load_data(batch_size,
               **kwargs):
 
     assert data_split in ['5_625', '2_8125', '1_40625']
-    for suffix in [f'weather_{data_split}deg', f'weather', f'{data_split}deg']:
-        if osp.exists(osp.join(data_root, suffix)):
-            weather_dataroot = osp.join(data_root, suffix)
+
+    weather_dataroot = None
+    candidate_roots = [
+        osp.join(data_root, f'weather_{data_split}deg'),
+        osp.join(data_root, 'weather'),
+        osp.join(data_root, f'{data_split}deg'),
+    ]
+    for candidate_root in candidate_roots:
+        if osp.isdir(candidate_root):
+            weather_dataroot = candidate_root
+            break
+
+    if weather_dataroot is None:
+        searched = ', '.join(candidate_roots)
+        raise FileNotFoundError(
+            f'WeatherBench data directory was not found. Searched: {searched}'
+        )
 
     train_set = WeatherBenchDataset(data_root=weather_dataroot,
                                     data_name=data_name, data_split=data_split,
@@ -256,7 +283,7 @@ def load_data(batch_size,
                                      pin_memory=True, drop_last=True,
                                      num_workers=num_workers,
                                      distributed=distributed, use_prefetcher=use_prefetcher)
-    dataloader_vali = create_loader(test_set, # validation_set,
+    dataloader_vali = create_loader(vali_set,
                                     batch_size=val_batch_size,
                                     shuffle=False, is_training=False,
                                     pin_memory=True, drop_last=drop_last,
