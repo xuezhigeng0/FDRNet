@@ -64,6 +64,29 @@ Dataset split:
 
 The model uses 12 input frames to predict the following 12 frames.
 
+## Synthetic Smoke-Test Dataset
+
+If the complete WeatherBench dataset is unavailable, a small synthetic dataset can be generated to verify installation, data loading, and tensor shapes:
+
+```bash
+python tools/prepare_data/generate_dummy_tp.py \
+  --output_root ./dummy_data \
+  --hours_per_year 48
+```
+
+The generated files follow the same directory structure and NetCDF variable conventions as the real dataset:
+
+```text
+dummy_data/
+└── weather/
+    └── total_precipitation/
+        ├── total_precipitation_2010_5.625deg.nc
+        ├── ...
+        └── total_precipitation_2018_5.625deg.nc
+```
+
+The synthetic dataset is intended only for smoke testing. It must not be used to reproduce or report the quantitative results in the paper.
+
 ## Training
 
 ```bash
@@ -115,6 +138,52 @@ Main settings:
 | Temporal hidden channels | 256 |
 | Spatial blocks | 2 |
 | Temporal blocks | 3 |
+
+## User Guide
+
+### Input and Output
+
+- Input tensor shape: `(B, 12, 1, 32, 64)`
+- Output tensor shape: `(B, 12, 1, 32, 64)`
+- `B` is the batch size.
+- The 12 input frames are used to predict the following 12 precipitation frames.
+- The single channel represents WeatherBench total precipitation (`tp`).
+
+### Main Command-Line Options
+
+- `--data_root`: parent directory containing `weather/total_precipitation/`.
+- `--config_file`: path to the SFDRNet experiment configuration.
+- `--res_dir`: root directory for checkpoints, logs, and prediction results.
+- `--ex_name`: experiment name used to create the output directory.
+- `--batch_size`: training batch size; reduce it when GPU memory is limited.
+- `--val_batch_size`: validation and testing batch size.
+
+With the provided scripts, experiment outputs are stored under:
+
+```text
+work_dirs/weather_tp_5_625/SFDRNet/
+```
+
+The best checkpoint is expected at:
+
+```text
+work_dirs/weather_tp_5_625/SFDRNet/checkpoints/best.ckpt
+```
+
+### Expected Behavior
+
+- Training reads hourly precipitation fields, normalizes validation and test data with training statistics, and saves checkpoints and logs.
+- Evaluation loads the trained checkpoint and reports precipitation prediction metrics.
+- The model returns 12 predicted frames with the same spatial resolution as the input.
+
+### Hardware Requirements
+
+- Tested GPU: NVIDIA RTX 3090 with 24 GB memory.
+- Tested CUDA version: 11.8.
+- The minimum GPU memory requirement has not been benchmarked.
+- Reduce `batch_size` and `val_batch_size` if an out-of-memory error occurs.
+- CPU execution has not been validated and is not recommended for training.
+
 
 ## Compatibility Notes
 
