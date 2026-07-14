@@ -6,11 +6,8 @@ from openstl.modules import (ConvSC, ConvNeXtSubBlock, ConvMixerSubBlock, GASubB
                              SwinSubBlock, UniformerSubBlock, VANSubBlock, ViTSubBlock, TAUSubBlock)
 
 
-import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.checkpoint import checkpoint
-from typing import List
 
 class SFFE(nn.Module):
     def __init__(self, C_in, C_out, n_bands=4, use_ts_band_gate: bool = True):
@@ -66,13 +63,13 @@ class SFFE(nn.Module):
         x_seq = x.view(B, C, L).transpose(1, 2)
         x_conv_in = x_seq.transpose(1, 2)
         norm_weights = torch.softmax(self.scale_weights, dim=0)
-        
+
         conv_bands = []
         for i, filt in enumerate(self.filters):
             b_conv = filt(x_conv_in).transpose(1, 2) * norm_weights[i]
             conv_bands.append(b_conv)
         target_lengths = [b.size(1) for b in conv_bands]
-        
+
         x_freq_domain = torch.fft.rfft(x_seq, dim=1)
         freqs = torch.fft.rfftfreq(L, device=x.device)
         n_freqs = len(freqs)
@@ -102,7 +99,7 @@ class SFFE(nn.Module):
                 band_time_resized = F.avg_pool1d(
                     band_time.transpose(1, 2), kernel_size=2, stride=2
                 ).transpose(1, 2)
-            
+
             freq_bands.append(band_time_resized)
         band_energy = torch.stack(band_energy_list, dim=1)  # (B, n_bands)
         # normalize energy to reduce scale sensitivity across batches
@@ -182,7 +179,7 @@ class Decoder(nn.Module):
         Y = self.readout(Y)
         return Y
 
-# ---------- 7. SimVP 主模型 ----------
+# ---------- 7. Main SimVP model ----------
 class SimVP_Model(nn.Module):
     def __init__(self, in_shape, hid_S=16, hid_T=256, N_S=4, N_T=4, model_type='gSTA',
                  mlp_ratio=8., drop=0.0, drop_path=0.0, spatio_kernel_enc=3,
@@ -218,7 +215,7 @@ class SimVP_Model(nn.Module):
         Y = Y.view(B, T, C, H, W)
         return Y
 
-# ---------- 8. Sampling 控制函数 ----------
+# ---------- 8. Sampling control ----------
 def sampling_generator(N, reverse=False):
     samplings = [False, True] * (N // 2)
     return list(reversed(samplings[:N])) if reverse else samplings[:N]
@@ -332,7 +329,7 @@ class MetaBlock(nn.Module):
 
     def forward(self, x):
         z = self.block(x)
-        
+
         return z if self.in_channels == self.out_channels else self.reduction(z)
 
 
@@ -343,21 +340,19 @@ class MidMetaNet(nn.Module):
                  input_resolution=None, model_type=None,
                  mlp_ratio=4., drop=0.0, drop_path=0.1):
         super(MidMetaNet, self).__init__()
-        assert N2 >= 1 and mlp_ratio > 1  # 修改断言，允许N2>=1
+        assert N2 >= 1 and mlp_ratio > 1  # Allow a single temporal block.
         self.N2 = N2
-        dpr = [x.item() for x in torch.linspace(1e-2, drop_path, max(1, self.N2))]  # 确保dpr至少有1个元素
+        dpr = [x.item() for x in torch.linspace(1e-2, drop_path, max(1, self.N2))]  # Ensure at least one drop-path value.
 
         enc_layers = []
         if N2 == 1:
-            print("N2=",N2)
-            # 当N2=1时，只使用一个中间层，保持输入输出通道相同
+            # For N2=1, use one block while preserving the channel dimension.
             enc_layers.append(MetaBlock(
                 channel_in, channel_in, input_resolution, model_type,
                 mlp_ratio, drop, drop_path=dpr[0], layer_i=0))
         else:
-            # 原始逻辑，N2>=2时
+            # Standard encoder-decoder construction for N2 >= 2.
             # downsample
-            print("N2=",N2)
             enc_layers.append(MetaBlock(
                 channel_in, channel_hid, input_resolution, model_type,
                 mlp_ratio, drop, drop_path=dpr[0], layer_i=0))
@@ -370,7 +365,7 @@ class MidMetaNet(nn.Module):
             enc_layers.append(MetaBlock(
                 channel_hid, channel_in, input_resolution, model_type,
                 mlp_ratio, drop, drop_path=dpr[-1], layer_i=N2-1))
-        
+
         self.enc = nn.Sequential(*enc_layers)
 
     def forward(self, x):
@@ -379,7 +374,7 @@ class MidMetaNet(nn.Module):
         x = x.reshape(B, T*C, H, W)
         #print("x,met", x.shape)
         z = x
-        
+
         for i in range(self.N2):
             #print("z before",z.shape)
             z = self.enc[i](z)

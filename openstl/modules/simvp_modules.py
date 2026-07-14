@@ -1,7 +1,7 @@
 import math
 import torch
 import torch.nn as nn
-import torch.nn.functional as F 
+import torch.nn.functional as F
 from timm.models.layers import DropPath, trunc_normal_
 from timm.models.convnext import ConvNeXtBlock
 from timm.models.mlp_mixer import MixerBlock
@@ -48,13 +48,9 @@ class BasicConv2d(nn.Module):
             nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
-       # x=x.view(x.size(0)*x.size(1),x.size(2),x.size(3),x.size(4))
-       # print(x.shape)
-        #B, T, C, H, W = x.shape
-       # x = x.view(B * T, C, H, W)
         if len(x.shape) == 5:
             B, T, C, H, W = x.shape
-        # 将时间维度 T 和 batch 大小 B 合并到一起，形成 4D 张量
+        # Merge the batch and temporal dimensions into a 4D tensor.
             x = x.view(B * T, C, H, W)
         y = self.conv(x)
         if self.act_norm:
@@ -116,7 +112,7 @@ class GroupConv2d(nn.Module):
 class gInception_ST(nn.Module):
     """A IncepU block for SimVP"""
 
-    def __init__(self, C_in, C_hid, C_out, incep_ker = [3,5,7,11], groups = 8):        
+    def __init__(self, C_in, C_hid, C_out, incep_ker = [3,5,7,11], groups = 8):
         super(gInception_ST, self).__init__()
         self.conv1 = nn.Conv2d(C_in, C_hid, kernel_size=1, stride=1, padding=0)
 
@@ -139,35 +135,35 @@ class gInception_ST(nn.Module):
 
 
 class ConvMixerSubBlock(nn.Module):
-    """具有多尺度卷积、1D卷积和加权融合的ConvMixer块。"""
-    
+    """ConvMixer block with multi-scale convolutions, temporal 1D convolution, and weighted fusion."""
+
     def __init__(self, dim, kernel_sizes=[7, 9, 11], activation=nn.GELU):
         super().__init__()
 
-        # 确保 kernel_sizes 至少包含一个值
+        # Require at least one kernel size.
         self.kernel_sizes = kernel_sizes
-        
-        # 为不同的卷积核尺寸创建卷积层列表
+
+        # Create one depthwise convolution branch for each kernel size.
         self.conv_dw = nn.ModuleList([
             nn.Conv2d(dim, dim, kernel_size=k, groups=dim, padding=k//2) for k in kernel_sizes
         ])
-        
-        # 为每个尺度（卷积核尺寸）创建可学习的权重
-        self.weights = nn.Parameter(torch.ones(len(kernel_sizes)))  # 形状: (len(kernel_sizes),)
 
-        # 用于时间感知的1D卷积层
-        self.conv_1d = nn.Conv1d(dim, dim, kernel_size=3, padding=1)  # 示例1D卷积
-        
-        # 激活函数和归一化
+        # Create learnable weights for the convolution branches.
+        self.weights = nn.Parameter(torch.ones(len(kernel_sizes)))  # Shape: (len(kernel_sizes),)
+
+        # Temporal 1D convolution.
+        self.conv_1d = nn.Conv1d(dim, dim, kernel_size=3, padding=1)  # Temporal convolution.
+
+        # Activation and normalization.
         self.act_1 = activation()
         self.norm_1 = nn.BatchNorm2d(dim)
-        
-        # 通道混合
+
+        # Channel mixing.
         self.conv_pw = nn.Conv2d(dim, dim, kernel_size=1)
         self.act_2 = activation()
         self.norm_2 = nn.BatchNorm2d(dim)
 
-        # 初始化权重
+        # Initialize weights.
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
@@ -186,30 +182,22 @@ class ConvMixerSubBlock(nn.Module):
         return dict()
 
     def forward(self, x):
-        # 对不同尺度应用多个卷积，并加权求和
+        # Apply the multi-scale convolution branches and compute their weighted sum.
         conv_outs = [self.conv_dw[i](x) for i in range(len(self.kernel_sizes))]
-        
-        # 应用学习的权重并求和结果
+
+        # Combine the branch outputs using learnable weights.
         weighted_sum = sum(w * conv_outs[i] for i, w in enumerate(self.weights))
-        
-        # 跳跃连接：将原始输入 'x' 加到加权和上
+
+        # Add the weighted response to the residual input.
         x = x + self.norm_1(self.act_1(weighted_sum))
-        #print(x.shape)
-        # 应用1D卷积以增强时间感知能力（假设时间是第二个维度）
-        x = x.permute(0, 2, 3, 1)  # 调整为 (batch, height, width, channels)
-        #print(x.shape)
-        x= x.view(x.size(0), -1, x.size(3))  # 压平 height 和 width 维度
-       # print(x.shape)
-        x=x.reshape(x.size(0), x.size(2), x.size(1))  # 压平 height 和 width 维度
-        x = self.conv_1d(x)  # 在最后一维（时间维度）上应用1D卷积
-        #print(x.shape)
-        x = x.view(x.size(0), -1, x.size(2), x.size(1))  # 重新调整形状
-       # print(x.shape)
-        # 假设x的初始形状为 [1, 1, 512, 384]
-# 我们将通道数从 1 调整为 384，确保符合卷积层的输入要求
-        x = x.reshape(x.size(0), x.size(3), x.size(2), x.size(1))  # 将通道数调整为 384
-       # print(x.shape)
-        # 使用1x1卷积进行通道混合
+        # Apply a 1D convolution to enhance sequential interactions.
+        x = x.permute(0, 2, 3, 1)  # Convert to the channels-last layout.
+        x= x.view(x.size(0), -1, x.size(3))  # Flatten the spatial dimensions.
+        x=x.reshape(x.size(0), x.size(2), x.size(1))  # Flatten the spatial dimensions.
+        x = self.conv_1d(x)  # Apply the 1D convolution along the flattened spatial sequence.
+        x = x.view(x.size(0), -1, x.size(2), x.size(1))  # Restore the spatial dimensions.
+        x = x.reshape(x.size(0), x.size(3), x.size(2), x.size(1))  # Restore the channel-first layout.
+        # Apply pointwise convolution for channel mixing.
         x = self.norm_2(self.act_2(self.conv_pw(x)))
         return x
 
@@ -308,7 +296,7 @@ class MogaSubBlock(nn.Module):
         super(MogaSubBlock, self).__init__()
         self.out_channels = embed_dims
         # spatial attention
-        self.norm1 = nn.BatchNorm2d(embed_dims)#2D 批量归一化
+        self.norm1 = nn.BatchNorm2d(embed_dims)#2D batch normalization
         self.attn = MultiOrderGatedAggregation(
             embed_dims,hidden_size)
         self.drop_path = DropPath(drop_path_rate) if drop_path_rate > 0. else nn.Identity()
@@ -340,8 +328,8 @@ class MogaSubBlock(nn.Module):
 
     def forward(self, x):
         x = x + self.drop_path(self.layer_scale_1 * self.attn(self.norm1(x)))
-        x = x.view(x.size(0), x.size(1), x.size(2), x.size(3))  
-        x= self.norm2(x)  
+        x = x.view(x.size(0), x.size(1), x.size(2), x.size(3))
+        x= self.norm2(x)
         x = x + self.drop_path(self.layer_scale_2 * self.mlp(x))
         return x
 
@@ -438,10 +426,6 @@ class VANSubBlock(VANBlock):
             if m.bias is not None:
                 m.bias.data.zero_()
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from timm.models.layers import trunc_normal_  # 保留其他timm导入
 
 class ActivationLinear(nn.Module):
     def __init__(self, in_dim, out_dim, use_gelu=False, bias=True):
@@ -449,14 +433,10 @@ class ActivationLinear(nn.Module):
         layers = [nn.Linear(in_dim, out_dim, bias=bias)]
         if use_gelu:
             layers.append(nn.GELU())
-
-            print(f"[ActivationLinear] Using GELU on layer with in_dim={in_dim}, out_dim={out_dim}")
-        else:
-            print(f"[ActivationLinear] Not using GELU on layer with in_dim={in_dim}, out_dim={out_dim}")
         self.proj = nn.Sequential(*layers)
 
     def forward(self, x):
-            
+
         return self.proj(x)
 
 
@@ -614,7 +594,7 @@ class RankAugmentedTokenStatisticsSelfAttention(nn.Module):
         return y, Pi, alpha
 
 
-# 多阶Krylov空间注意力头
+# Multi-order projection attention head
 class MPABlock(nn.Module):
     """
     Multi-order Projection Attention head.
@@ -644,7 +624,7 @@ class MPABlock(nn.Module):
         self.rala_phi_act = rala_phi_act
         self.rala_eps = rala_eps
 
-        # 每阶使用不同激活策略：i=0 不激活，i>0 使用 GELU
+        # Use no activation for order zero and GELU for higher orders.
         self.q_projs = nn.ModuleList([
             ActivationLinear(dim, krylov_dim, use_gelu=(i > 0), bias=use_bias)
             for i in range(order)
@@ -693,7 +673,7 @@ class MPABlock(nn.Module):
             nn.LayerNorm(dim) if use_bias else nn.Identity()
         )
 
-        self.order_weights = nn.Parameter(torch.ones(order, 1, 1, 1))  # 每阶一个权重参数
+        self.order_weights = nn.Parameter(torch.ones(order, 1, 1, 1))  # One learnable weight for each order.
 
     def forward(self, x):
         B, N, C = x.shape
@@ -730,7 +710,7 @@ class MPABlock(nn.Module):
         out = torch.cat(outputs, dim=-1)
         return self.to_out(out)
 
-# 分组前馈网络
+# Grouped feed-forward network
 class GroupedMLP(nn.Module):
     def __init__(self, dim, mlp_hidden_dim, groups=4, drop=0.):
         super().__init__()
@@ -758,9 +738,9 @@ class GroupedMLP(nn.Module):
         x = x.view(B, self.groups, N, self.group_dim).permute(0, 2, 1, 3).contiguous()
         return x.view(B, N, C)
 
-# 整体KAN块
+# Multi-order projected interaction block
 class MPA(nn.Module):
-    """增强版MultiKAN层：添加门控机制和FFN"""
+    """Multi-order projected interaction layer with gating and a feed-forward network."""
     def __init__(self, dim, krylov_dim, order=3, rank=8, heads=4,
                  mlp_ratio=2.0, drop=0., drop_path=0.1, use_gate=True,
                  use_tssa: bool = False, tssa_max_len: int = 4096, attn_drop: float = 0.0,
@@ -816,10 +796,6 @@ class MPA(nn.Module):
 
         return x
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from timm.models.layers import DropPath, trunc_normal_
 
 
 class MultiStepODEFusion2D(nn.Module):
@@ -1226,7 +1202,7 @@ class ViTSubBlock(nn.Module):
         self.dim = dim
         self.norm1 = nn.LayerNorm(dim)
 
-        # KAN/MPA 模块
+        # MPA module
         self.MPA = MPA(
             dim=dim,
             krylov_dim=krylov_dim,
@@ -1274,22 +1250,22 @@ class ViTSubBlock(nn.Module):
         mpa_out = self.MPA(self.norm1(x_flat))
         mpa_out = mpa_out * self.gamma_mpa.view(1, 1, C)
         x = x_flat + self.drop_path(mpa_out)
-        
+
         x2d = x.reshape(B, H, W, C).permute(0, 3, 1, 2).contiguous()
         x2d = x2d + self.drop_path(self.fbrm(x2d) * self.gamma_fbrm.view(1, C, 1, 1))
         return x2d
-    
-          
+
+
 class TemporalAttention(nn.Module):
     """A Temporal Attention block for Temporal Attention Unit"""
 
     def __init__(self, d_model, kernel_size=21, attn_shortcut=True):
         super().__init__()
 
-        self.proj_1 = nn.Conv2d(d_model, d_model, 1)  
-        self.activation = nn.GELU()                 
+        self.proj_1 = nn.Conv2d(d_model, d_model, 1)
+        self.activation = nn.GELU()
         self.spatial_gating_unit = TemporalAttentionModule(d_model, kernel_size)
-        self.proj_2 = nn.Conv2d(d_model, d_model, 1)        
+        self.proj_2 = nn.Conv2d(d_model, d_model, 1)
         self.attn_shortcut = attn_shortcut
 
     def forward(self, x):
@@ -1302,7 +1278,7 @@ class TemporalAttention(nn.Module):
         if self.attn_shortcut:
             x = x + shortcut
         return x
-    
+
 
 class TemporalAttentionModule(nn.Module):
     """Large Kernel Attention for SimVP"""
@@ -1330,15 +1306,15 @@ class TemporalAttentionModule(nn.Module):
 
     def forward(self, x):
         u = x.clone()
-        attn = self.conv0(x)           
-        attn = self.conv_spatial(attn) 
-        f_x = self.conv1(attn)         
+        attn = self.conv0(x)
+        attn = self.conv_spatial(attn)
+        f_x = self.conv1(attn)
 
         b, c, _, _ = x.size()
         se_atten = self.avg_pool(x).view(b, c)
         se_atten = self.fc(se_atten).view(b, c, 1, 1)
         return se_atten * f_x * u
-    
+
 class AttentionModule(nn.Module):
     """Large Kernel Attention for SimVP"""
 
@@ -1358,7 +1334,7 @@ class AttentionModule(nn.Module):
         u = x.clone()
         attn = self.conv0(x)           # depth-wise conv
         attn = self.conv_spatial(attn) # depth-wise dilation convolution
-        
+
         f_g = self.conv1(attn)
         split_dim = f_g.shape[1] // 2
         f_x, g_x = torch.split(f_g, split_dim, dim=1)
@@ -1442,6 +1418,5 @@ class TAUSubBlock(GASubBlock):
                  drop=0., drop_path=0.1, init_value=1e-2, act_layer=nn.GELU):
         super().__init__(dim=dim, kernel_size=kernel_size, mlp_ratio=mlp_ratio,
                  drop=drop, drop_path=drop_path, init_value=init_value, act_layer=act_layer)
-        
-        self.attn = TemporalAttention(dim, kernel_size)
 
+        self.attn = TemporalAttention(dim, kernel_size)
