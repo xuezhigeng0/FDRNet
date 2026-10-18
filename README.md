@@ -1,93 +1,63 @@
 # SFDRNet
 
-Official PyTorch implementation of:
+**Spatiotemporal-Frequency Differential and Frequency-Dynamic Residual Network for Sparse Precipitation Image Sequence Prediction**
 
-**Precipitation Prediction via Spatiotemporal-Frequency Differential and Frequency-Dynamic Residual Network**
+This repository is the official PyTorch implementation of SFDRNet for sparse precipitation image sequence prediction on WeatherBench total precipitation (`tp`). It builds on OpenSTL and uses its SimVP experiment interface; vanilla SimVP is a separate model.
 
-SFDRNet is a precipitation prediction model built on the OpenSTL framework.
+## Environment and Installation
 
-## Environment
-
-The released code was tested with:
-
-- Linux
-- Python 3.10.20
-- PyTorch 2.1.1+cu118
-- CUDA 11.8
-- timm 0.6.11
-- NVIDIA RTX 3090
-
-## Installation
+The released code was tested on Linux with Python 3.10.20, PyTorch 2.1.1+cu118, CUDA 11.8, timm 0.6.11, and an NVIDIA RTX 3090. `requirements.txt` includes `requirements/runtime.txt`; `environment.yml` specifies compatible Python, PyTorch, and CUDA generations.
 
 ```bash
 conda create -n sfdrnet python=3.10.20 -y
 conda activate sfdrnet
-
-pip install torch==2.1.1+cu118 \
-  torchvision==0.16.1+cu118 \
-  torchaudio==2.1.1+cu118 \
+pip install torch==2.1.1+cu118 torchvision==0.16.1+cu118 torchaudio==2.1.1+cu118 \
   --index-url https://download.pytorch.org/whl/cu118
-
 pip install -r requirements.txt
 pip install -e .
 ```
 
 ## Dataset
 
-The model uses hourly WeatherBench total precipitation at 5.625-degree resolution.
+Use hourly WeatherBench total precipitation NetCDF data from the [WeatherBench project](https://github.com/pangeo-data/WeatherBench). Each file must contain `tp` with dimensions `(time, lat, lon)`. The loader selects files by their resolution suffix.
 
-Each NetCDF file must contain:
+| Benchmark | Resolution | Grid | Dataset identifier |
+|---|---:|---:|---|
+| `tp_5.625` | 5.625° | 32 × 64 | `weather_tp_5_625` |
+| `tp_2.8125` | 2.8125° | 64 × 128 | `weather_tp_2_8125` |
 
-- Variable: `tp`
-- Dimensions: `(time, lat, lon)`
-- Spatial shape: `32 x 64`
+Both benchmarks use 2010–2015 for training, 2016 for validation, and 2017–2018 for testing. Each sample uses 12 input frames to predict the following 12 frames. Validation and test data are normalized using training statistics.
 
-Expected directory structure:
+The loader accepts `DATA_ROOT/weather/total_precipitation/`. It looks for `total_precipitation*_5.625deg.nc` or `total_precipitation*_2.8125deg.nc`, respectively. The supplied generator writes these filenames:
 
 ```text
 DATA_ROOT/
 └── weather/
     └── total_precipitation/
         ├── total_precipitation_2010_5.625deg.nc
-        ├── total_precipitation_2011_5.625deg.nc
         ├── ...
-        └── total_precipitation_2018_5.625deg.nc
+        ├── total_precipitation_2018_5.625deg.nc
+        ├── total_precipitation_2010_2.8125deg.nc
+        ├── ...
+        └── total_precipitation_2018_2.8125deg.nc
 ```
 
-Dataset split:
+The loader also accepts `DATA_ROOT/weather_5_625deg/` and `DATA_ROOT/weather_2_8125deg/` as resolution-specific roots, each containing `total_precipitation/`. Files from both resolutions may share `DATA_ROOT/weather/`.
 
-| Split | Years |
-|---|---|
-| Training | 2010-2015 |
-| Validation | 2016 |
-| Testing | 2017-2018 |
-
-The model uses 12 input frames to predict the following 12 frames.
-
-## Synthetic Smoke-Test Dataset
-
-If the complete WeatherBench dataset is unavailable, a small synthetic dataset can be generated to verify installation, data loading, and tensor shapes:
+### Synthetic installation checks
 
 ```bash
-python tools/prepare_data/generate_dummy_tp.py \
-  --output_root ./dummy_data \
-  --hours_per_year 48
+python tools/prepare_data/generate_dummy_tp.py --output_root ./dummy_data --resolution 5.625 --hours_per_year 48
+python tools/prepare_data/generate_dummy_tp.py --output_root ./dummy_data --resolution 2.8125 --hours_per_year 48
 ```
 
-The generated files follow the same directory structure and NetCDF variable conventions as the real dataset:
+These synthetic files are only for installation and smoke testing. They must not be used to reproduce or report manuscript quantitative results.
 
-```text
-dummy_data/
-└── weather/
-    └── total_precipitation/
-        ├── total_precipitation_2010_5.625deg.nc
-        ├── ...
-        └── total_precipitation_2018_5.625deg.nc
-```
+## Training and Evaluation
 
-The synthetic dataset is intended only for smoke testing. It must not be used to reproduce or report the quantitative results in the paper.
+Run these commands from the repository root. Replace `/path/to/DATA_ROOT` with the parent directory containing `weather/` or `weather_<resolution>deg/`.
 
-## Training
+Train `tp_5.625`:
 
 ```bash
 python tools/train.py \
@@ -95,122 +65,81 @@ python tools/train.py \
   --config_file configs/weather/tp_5_625/SFDRNet.py \
   --data_root /path/to/DATA_ROOT \
   --res_dir work_dirs \
-  --ex_name SFDRNet
+  --ex_name SFDRNet_tp_5_625
 ```
 
-## Evaluation
-
-Place the trained checkpoint at:
-
-```text
-work_dirs/weather_tp_5_625/SFDRNet/checkpoints/best.ckpt
-```
-
-Then run:
+Evaluate `tp_5.625` after training:
 
 ```bash
 python tools/test.py \
+  --test \
   --dataname weather_tp_5_625 \
   --config_file configs/weather/tp_5_625/SFDRNet.py \
   --data_root /path/to/DATA_ROOT \
   --res_dir work_dirs \
-  --ex_name SFDRNet
+  --ex_name SFDRNet_tp_5_625
 ```
 
-## Configuration
+Train `tp_2.8125`:
 
-The released experiment configuration is:
-
-```text
-configs/weather/tp_5_625/SFDRNet.py
+```bash
+python tools/train.py \
+  --dataname weather_tp_2_8125 \
+  --config_file configs/weather/tp_2_8125/SFDRNet.py \
+  --data_root /path/to/DATA_ROOT \
+  --res_dir work_dirs \
+  --ex_name SFDRNet_tp_2_8125
 ```
 
-Main settings:
+Evaluate `tp_2.8125` after training:
 
-| Parameter | Value |
-|---|---:|
-| Input shape | `12 x 1 x 32 x 64` |
-| Batch size | 16 |
-| Epochs | 200 |
-| Optimizer | Adam |
-| Learning rate | 0.001 |
-| Spatial hidden channels | 32 |
-| Temporal hidden channels | 256 |
-| Spatial blocks | 2 |
-| Temporal blocks | 3 |
-
-## User Guide
-
-### Input and Output
-
-- Input tensor shape: `(B, 12, 1, 32, 64)`
-- Output tensor shape: `(B, 12, 1, 32, 64)`
-- `B` is the batch size.
-- The 12 input frames are used to predict the following 12 precipitation frames.
-- The single channel represents WeatherBench total precipitation (`tp`).
-
-### Main Command-Line Options
-
-- `--data_root`: parent directory containing `weather/total_precipitation/`.
-- `--config_file`: path to the SFDRNet experiment configuration.
-- `--res_dir`: root directory for checkpoints, logs, and prediction results.
-- `--ex_name`: experiment name used to create the output directory.
-- `--batch_size`: training batch size; reduce it when GPU memory is limited.
-- `--val_batch_size`: validation and testing batch size.
-
-With the provided scripts, experiment outputs are stored under:
-
-```text
-work_dirs/weather_tp_5_625/SFDRNet/
+```bash
+python tools/test.py \
+  --test \
+  --dataname weather_tp_2_8125 \
+  --config_file configs/weather/tp_2_8125/SFDRNet.py \
+  --data_root /path/to/DATA_ROOT \
+  --res_dir work_dirs \
+  --ex_name SFDRNet_tp_2_8125
 ```
 
-The best checkpoint is expected at:
+For each command, outputs are under `work_dirs/<ex_name>/`, including logs and `checkpoints/best.ckpt`. The evaluation command uses `--test` to load that checkpoint. A checkpoint must be produced by training or supplied separately; pretrained weights are not included here. The pipeline supports the manuscript metrics MSE, MAE, RMSE, PSNR, and SNR.
 
-```text
-work_dirs/weather_tp_5_625/SFDRNet/checkpoints/best.ckpt
-```
+Both configurations specify batch size 16, validation batch size 16, 200 epochs, Adam with learning rate `1e-3` and weight decay `0`, cosine annealing without warmup, seed 42, `hid_S=32`, `hid_T=256`, `N_S=2`, `N_T=3`, spatial kernel size 3, and `drop_path=0.1`. Input and output shapes are `(B, 12, 1, 32, 64)` for 5.625° and `(B, 12, 1, 64, 128)` for 2.8125°.
 
-### Expected Behavior
+## Implementation Mapping
 
-- Training reads hourly precipitation fields, normalizes validation and test data with training statistics, and saves checkpoints and logs.
-- Evaluation loads the trained checkpoint and reports precipitation prediction metrics.
-- The model returns 12 predicted frames with the same spatial resolution as the input.
+Historical class names remain in the code for checkpoint compatibility.
 
-### Hardware Requirements
-
-- Tested GPU: NVIDIA RTX 3090 with 24 GB memory.
-- Tested CUDA version: 11.8.
-- The minimum GPU memory requirement has not been benchmarked.
-- Reduce `batch_size` and `val_batch_size` if an out-of-memory error occurs.
-- CPU execution has not been validated and is not recommended for training.
-
+| Manuscript component | Code implementation | Location |
+|---|---|---|
+| SFDRNet | `SimVP_Model` with `model_type="vit"` and the OpenSTL `SimVP` method | `openstl/models/simvp_model.py`; `openstl/methods/simvp.py` |
+| Statistics-guided Dynamic Spectral Extractor (SDSE) | `SFFE` in the encoder and decoder | `openstl/models/simvp_model.py` |
+| Statistics-guided ODE Differential Pyramid (SODP) | `MDP` with `MultiStepODEFusion2D` | `openstl/modules/simvp_modules.py` |
+| Gated Multi-order Projected Interaction (GMPI) | `MPA` with `MPABlock` | `openstl/modules/simvp_modules.py` |
+| Frequency-Dynamic Residual Refinement (FDRR) | `FreqBandResidualMix`, used by `ViTSubBlock` | `openstl/modules/simvp_modules.py` |
 
 ## Compatibility Notes
 
-The public model name is **SFDRNet**.
-
-For compatibility with OpenSTL and the released checkpoint, the implementation retains:
+For compatibility with OpenSTL and existing checkpoints, the experiment retains:
 
 ```python
 method = "SimVP"
 model_type = "vit"
 ```
 
-Early experiment records may use the name **SimVP-TRF3**. SimVP-TRF3 and SFDRNet refer to the same model.
+These values select the SFDRNet implementation in this repository; they do not identify vanilla SimVP as SFDRNet. Early experiment records may use **SimVP-TRF3**. SimVP-TRF3 and SFDRNet refer to the same model. Existing model class names, parameter names, and tensor shapes are retained.
 
-The cleaned implementation was strictly verified against the original checkpoint:
+## Reported Manuscript Results
 
-- 504 matching state-dictionary entries
-- 0 missing entries
-- 0 unexpected entries
-- 0 shape mismatches
+These are reported manuscript results, not automatically reproduced measurements from this repository checkout.
 
-The model contains 1,533,606 parameters.
+| Benchmark | Parameters | MSE | MAE | RMSE | PSNR | SNR |
+|---|---:|---:|---:|---:|---:|---:|
+| `tp_5.625` | 1.534M | 1.059e-7 | 9.112e-5 | 3.254e-4 | 70.389 | 2.476 |
+| `tp_2.8125` | 1.534M | 9.187e-8 | 8.325e-5 | 3.031e-4 | 70.782 | 2.984 |
 
-## Acknowledgements
+## Acknowledgements and License
 
-This repository is based on OpenSTL. We thank the OpenSTL authors and contributors.
+This repository builds upon [OpenSTL](https://github.com/chengtan9907/OpenSTL). Original OpenSTL components retain their CAIRI/OpenSTL copyright and license notices. SFDRNet-specific modifications are released under the repository's [Apache License 2.0](LICENSE) terms unless otherwise stated.
 
-## License
-
-This project is released under the Apache License 2.0.

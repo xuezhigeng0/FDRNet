@@ -124,6 +124,22 @@ lightning_logs/
 
 # Pytorch
 *.pth
+*.pt
+*.ckpt
+checkpoints/
+logs/
+datasets/
+dummy_data/
+*.nc
+*.npy
+*.npz
+*.h5
+*.hdf5
+outputs/
+tmp/
+temp/
+.env.*
+!.env.example
 
 *.swp
 .DS_Store

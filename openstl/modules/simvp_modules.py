@@ -478,7 +478,11 @@ class TokenStatisticsSelfAttention(nn.Module):
 
         w_sq = w ** 2
         denom = torch.cumsum(w_sq, dim=-2).clamp_min(1e-12)
-        w_normed = (w_sq / denom) + self.denom_bias[:, :N, :].unsqueeze(0)
+        # Extend with zero bias beyond the checkpoint's learned token range.
+        bias = self.denom_bias
+        if N > bias.shape[1]:
+            bias = F.pad(bias, (0, 0, 0, N - bias.shape[1]))
+        w_normed = (w_sq / denom) + bias[:, :N, :].unsqueeze(0)
         tmp = torch.sum(w_normed, dim=-1) * self.temp.unsqueeze(0)  # (B, heads, N)
 
         Pi = F.softmax(tmp, dim=1)
@@ -569,7 +573,11 @@ class RankAugmentedTokenStatisticsSelfAttention(nn.Module):
 
         w_sq = w ** 2
         denom = torch.cumsum(w_sq, dim=-2).clamp_min(1e-12)
-        w_normed = (w_sq / denom) + self.denom_bias[:, :N, :].unsqueeze(0)
+        # Extend with zero bias beyond the checkpoint's learned token range.
+        bias = self.denom_bias
+        if N > bias.shape[1]:
+            bias = F.pad(bias, (0, 0, 0, N - bias.shape[1]))
+        w_normed = (w_sq / denom) + bias[:, :N, :].unsqueeze(0)
         tmp = torch.sum(w_normed, dim=-1) * self.temp.unsqueeze(0)  # (B, heads, N)
 
         # Membership over heads (unchanged)
@@ -962,9 +970,7 @@ class MDP(nn.Module):
             nn.GELU()
         )
 
-        # FuseUNet-inspired multi-scale ODE fusion (works on the same per-level Wi maps after resizing)
-        # FuseUNet-inspired multi-scale ODE fusion (memory-efficient):
-        # compress channels before ODE fusion, then project back.
+        # Compress multiscale features before ODE fusion, then project back.
         ode_dim = max(32, min(128, int(in_channels * 0.25)))
         self.ode_dim = ode_dim
         group_ode = math.gcd(ode_dim, min(32, ode_dim))
@@ -1079,7 +1085,7 @@ class MDP(nn.Module):
         fused = (fused / float(self.max_levels)) * bg_mask
         fused_base = self.fusion_conv(fused)
 
-        # ===== FuseUNet-style ODE fusion on multi-scale Wi maps (coarse->fine) =====
+        # Fuse multiscale features from coarse to fine.
         if self.use_ode_fusion and active_levels >= 2:
             ode_seq = list(reversed(weighted_features[:active_levels]))  # coarse -> fine
             ode_small_seq = [self.ode_down(w) for w in ode_seq]
@@ -1133,7 +1139,7 @@ class FreqBandResidualMix(nn.Module):
 
         # background-aware mask params (suppress perturbation on near-zero regions)
         self.bg_k = nn.Parameter(torch.tensor(10.0))
-        self.bg_tau = nn.Parameter(torch.tensor(0.18))  # heuristic init (your earlier radar bias)
+        self.bg_tau = nn.Parameter(torch.tensor(0.18))  # background-mask threshold initialization
 
         # LayerScale for safe residual
         self.gamma = nn.Parameter(torch.ones(dim) * 1e-3)
@@ -1420,3 +1426,4 @@ class TAUSubBlock(GASubBlock):
                  drop=drop, drop_path=drop_path, init_value=init_value, act_layer=act_layer)
 
         self.attn = TemporalAttention(dim, kernel_size)
+

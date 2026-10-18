@@ -73,6 +73,8 @@ class Config:
             temp_config_file = tempfile.NamedTemporaryFile(
                 dir=temp_config_dir, suffix=fileExtname)
             temp_config_name = osp.basename(temp_config_file.name)
+            # Allow the config to be reopened for writing on Windows.
+            temp_config_file.close()
 
             # Substitute predefined variables
             if use_predefined_variables:
@@ -94,11 +96,10 @@ class Config:
                 }
                 # delete imported module
                 del sys.modules[temp_module_name]
-            # close temp file
-            temp_config_file.close()
         return cfg_dict
 
     @staticmethod
     def fromfile(filename, use_predefined_variables=True):
         cfg_dict = Config._file2dict(filename, use_predefined_variables)
         return Config(cfg_dict, filename=filename)
+
