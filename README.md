@@ -130,6 +130,8 @@ model_type = "vit"
 
 These values select the SFDRNet implementation in this repository; they do not identify vanilla SimVP as SFDRNet. Early experiment records may use **SimVP-TRF3**. SimVP-TRF3 and SFDRNet refer to the same model. Existing model class names, parameter names, and tensor shapes are retained.
 
+Under either released configuration, the model has 1,533,606 parameters and 504 state-dictionary entries.
+
 ## Reported Manuscript Results
 
 These are reported manuscript results, not automatically reproduced measurements from this repository checkout.
