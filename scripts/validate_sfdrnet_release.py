@@ -10,7 +10,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from openstl.datasets import dataset_parameters
-from openstl.models import SimVP_Model
+from openstl.models import SimVP_Model, SFDRNet, SDSE
+from openstl.modules import SODP, GMPI, FDRR
 from openstl.utils import load_config
 
 
@@ -25,6 +26,14 @@ MODEL_KEYS = (
 
 
 def validate(skip_forward=False, skip_high_res_forward=False):
+    # Public manuscript-facing aliases must resolve to the historical implementation
+    # classes so checkpoint keys and tensor shapes remain unchanged.
+    assert SFDRNet is SimVP_Model
+    assert SDSE.__name__ == "SFFE"
+    assert SODP.__name__ == "MDP"
+    assert GMPI.__name__ == "MPA"
+    assert FDRR.__name__ == "FreqBandResidualMix"
+
     states = []
     for dataname, config_path, expected_shape in EXPERIMENTS:
         parameters = dataset_parameters[dataname]
@@ -37,7 +46,7 @@ def validate(skip_forward=False, skip_high_res_forward=False):
         assert config["method"] == "SimVP", config_path
         assert config["model_type"] == "vit", config_path
         model_args = {key: config[key] for key in MODEL_KEYS}
-        model = SimVP_Model(in_shape=expected_shape, **model_args)
+        model = SFDRNet(in_shape=expected_shape, **model_args)
         count = sum(parameter.numel() for parameter in model.parameters())
         assert count == 1_533_606, (dataname, count)
         states.append({key: value.shape for key, value in model.state_dict().items()})
