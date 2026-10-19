@@ -1,20 +1,23 @@
 import torch
-from openstl.models import SimVP_Model
+from openstl.models import SimVP_Model, SFDRNet
 from .base_method import Base_method
 
 
 class SimVP(Base_method):
-    r"""SimVP
+    r"""OpenSTL SimVP experiment interface.
 
-    Implementation of `SimVP: Simpler yet Better Video Prediction
-    <https://arxiv.org/abs/2206.05099>`_.
-
+    In this repository, model_type="vit" selects the SFDRNet implementation
+    used by the manuscript. Other model types retain the OpenSTL SimVP behavior.
     """
 
     def __init__(self, **args):
         super().__init__(**args)
 
     def _build_model(self, **args):
+        # The manuscript configuration uses model_type="vit", which selects SFDRNet.
+        # SFDRNet is an alias of SimVP_Model, so checkpoint/state-dict compatibility is unchanged.
+        if str(args.get("model_type", "")).lower() == "vit":
+            return SFDRNet(**args)
         return SimVP_Model(**args)
 
     def forward(self, batch_x, batch_y=None, **kwargs):
