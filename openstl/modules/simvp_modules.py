@@ -748,7 +748,10 @@ class GroupedMLP(nn.Module):
 
 # Multi-order projected interaction block
 class MPA(nn.Module):
-    """Multi-order projected interaction layer with gating and a feed-forward network."""
+    """Gated Multi-order Projected Interaction (GMPI).
+
+    The historical class name ``MPA`` is retained for checkpoint and code compatibility.
+    """
     def __init__(self, dim, krylov_dim, order=3, rank=8, heads=4,
                  mlp_ratio=2.0, drop=0., drop_path=0.1, use_gate=True,
                  use_tssa: bool = False, tssa_max_len: int = 4096, attn_drop: float = 0.0,
@@ -923,6 +926,10 @@ class MultiStepODEFusion2D(nn.Module):
 
 
 class MDP(nn.Module):
+    """Statistics-guided ODE Differential Pyramid (SODP).
+
+    The historical class name ``MDP`` is retained for checkpoint and code compatibility.
+    """
 
     def __init__(
         self,
@@ -1099,7 +1106,11 @@ class MDP(nn.Module):
 
 class FreqBandResidualMix(nn.Module):
     """
-    Frequency-Dynamic Residual Mixing (FBRM) - a light-weight, OOM-safe module inspired by
+    Frequency-Dynamic Residual Refinement (FDRR), implemented by the historical
+    ``FreqBandResidualMix`` class. The historical class name is retained for
+    checkpoint and code compatibility.
+
+    This is a light-weight, OOM-safe module inspired by
     'Frequency Dynamic Convolution for Dense Image Prediction' (CVPR 2025).
 
     Key idea we borrow (NOT a direct copy):
@@ -1202,14 +1213,22 @@ class FreqBandResidualMix(nn.Module):
         return (y * bg_mask) * self.gamma.view(1, self.dim, 1, 1)
 
 
+# Manuscript-facing aliases. These aliases point to the original class objects,
+# so model behavior, parameter names, state-dict keys, and checkpoint compatibility
+# are unchanged.
+SODP = MDP
+GMPI = MPA
+FDRR = FreqBandResidualMix
+
+
 class ViTSubBlock(nn.Module):
     def __init__(self, dim, mlp_ratio=2., drop=0., drop_path=0.1, max_diff_levels=3, krylov_dim=32, order=3, rank=8, heads=4):
         super().__init__()
         self.dim = dim
         self.norm1 = nn.LayerNorm(dim)
 
-        # MPA module
-        self.MPA = MPA(
+        # GMPI module; historical attribute name ``MPA`` is retained for checkpoint compatibility.
+        self.MPA = GMPI(
             dim=dim,
             krylov_dim=krylov_dim,
             order=order,
@@ -1217,7 +1236,8 @@ class ViTSubBlock(nn.Module):
             heads=heads
         )
 
-        self.diff = MDP(
+        # SODP module; historical attribute name ``diff`` is retained for checkpoint compatibility.
+        self.diff = SODP(
             in_channels=dim,
             max_levels=max_diff_levels
         )
@@ -1226,7 +1246,8 @@ class ViTSubBlock(nn.Module):
         # LayerScale: stabilize residual magnitudes (often improves MAE on sparse targets)
         self.gamma_diff = nn.Parameter(torch.ones(dim) * 1e-3)
         self.gamma_mpa  = nn.Parameter(torch.ones(dim) * 1e-3)
-        self.fbrm = FreqBandResidualMix(dim)
+        # FDRR module; historical attribute name ``fbrm`` is retained for checkpoint compatibility.
+        self.fbrm = FDRR(dim)
         self.gamma_fbrm = nn.Parameter(torch.ones(dim) * 1.0)
         self.apply(self._init_weights)
 
