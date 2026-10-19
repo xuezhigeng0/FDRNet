@@ -107,6 +107,16 @@ For each command, outputs are under `work_dirs/<ex_name>/`, including logs and `
 
 Both configurations specify batch size 16, validation batch size 16, 200 epochs, Adam with learning rate `1e-3` and weight decay `0`, cosine annealing without warmup, seed 42, `hid_S=32`, `hid_T=256`, `N_S=2`, `N_T=3`, spatial kernel size 3, and `drop_path=0.1`. Input and output shapes are `(B, 12, 1, 32, 64)` for 5.625° and `(B, 12, 1, 64, 128)` for 2.8125°.
 
+### Release validation
+
+With the project dependencies installed, run the lightweight CPU checks without training:
+
+```bash
+python scripts/validate_sfdrnet_release.py
+```
+
+The script checks both configs, dataset registrations, parameter counts, state-dict shapes, and one forward pass per resolution. Use `--skip-high-res-forward` if CPU memory is limited. These are release smoke checks, not a reproduction of manuscript metrics.
+
 ## Implementation Mapping
 
 Historical class names remain in the code for checkpoint compatibility.
@@ -140,6 +150,10 @@ These are reported manuscript results, not automatically reproduced measurements
 |---|---:|---:|---:|---:|---:|---:|
 | `tp_5.625` | 1.534M | 1.059e-7 | 9.112e-5 | 3.254e-4 | 70.389 | 2.476 |
 | `tp_2.8125` | 1.534M | 9.187e-8 | 8.325e-5 | 3.031e-4 | 70.782 | 2.984 |
+
+## Citation
+
+If you use this repository, please cite the corresponding SFDRNet manuscript: “Spatiotemporal-Frequency Differential and Frequency-Dynamic Residual Network for Sparse Precipitation Image Sequence Prediction.” A full BibTeX entry can be added after publication.
 
 ## Acknowledgements and License
 

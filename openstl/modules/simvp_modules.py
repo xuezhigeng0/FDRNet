@@ -478,7 +478,7 @@ class TokenStatisticsSelfAttention(nn.Module):
 
         w_sq = w ** 2
         denom = torch.cumsum(w_sq, dim=-2).clamp_min(1e-12)
-        # Extend with zero bias beyond the checkpoint's learned token range.
+        # Zero-extend beyond the learned 4096 positions without changing checkpoint tensor shapes.
         bias = self.denom_bias
         if N > bias.shape[1]:
             bias = F.pad(bias, (0, 0, 0, N - bias.shape[1]))
@@ -573,7 +573,7 @@ class RankAugmentedTokenStatisticsSelfAttention(nn.Module):
 
         w_sq = w ** 2
         denom = torch.cumsum(w_sq, dim=-2).clamp_min(1e-12)
-        # Extend with zero bias beyond the checkpoint's learned token range.
+        # Zero-extend beyond the learned 4096 positions without changing checkpoint tensor shapes.
         bias = self.denom_bias
         if N > bias.shape[1]:
             bias = F.pad(bias, (0, 0, 0, N - bias.shape[1]))
