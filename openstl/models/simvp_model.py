@@ -10,6 +10,11 @@ import torch.nn.functional as F
 from torch.utils.checkpoint import checkpoint
 
 class SFFE(nn.Module):
+    """Statistics-guided Dynamic Spectral Extractor (SDSE).
+
+    The historical class name ``SFFE`` is retained for checkpoint and code compatibility.
+    """
+
     def __init__(self, C_in, C_out, n_bands=4, use_ts_band_gate: bool = True):
         super().__init__()
         self.C_in = C_in
@@ -147,13 +152,20 @@ class SFFE(nn.Module):
         x_proj = x_proj * bg_mask
         out = x_proj.transpose(1, 2).view(B, self.C_out, H, W)
         return out
+
+
+# Manuscript-facing alias. It is the same class object, so parameter names and
+# checkpoint tensor keys remain unchanged.
+SDSE = SFFE
+
+
 class Encoder(nn.Module):
     def __init__(self, C_in, C_hid, N_S, spatio_kernel, act_inplace=True):
         samplings = sampling_generator(N_S)
         super(Encoder, self).__init__()
         self.enc = nn.Sequential(
-            SFFE(C_in, C_hid),
-            *[SFFE(C_hid, C_hid) for _ in samplings[1:]]
+            SDSE(C_in, C_hid),
+            *[SDSE(C_hid, C_hid) for _ in samplings[1:]]
         )
 
     def forward(self, x):
@@ -167,7 +179,7 @@ class Decoder(nn.Module):
     def __init__(self, C_hid, C_out, N_S, spatio_kernel, act_inplace=True):
         super(Decoder, self).__init__()
         self.dec = nn.Sequential(
-            *[SFFE(C_hid, C_hid) for _ in range(N_S)]
+            *[SDSE(C_hid, C_hid) for _ in range(N_S)]
         )
         self.readout = nn.Conv2d(C_hid, C_out, 1)
 
@@ -178,7 +190,7 @@ class Decoder(nn.Module):
         Y = self.readout(Y)
         return Y
 
-# ---------- 7. Main SimVP model ----------
+# ---------- 7. Main SFDRNet model (historical class: SimVP_Model) ----------
 class SimVP_Model(nn.Module):
     def __init__(self, in_shape, hid_S=16, hid_T=256, N_S=4, N_T=4, model_type='gSTA',
                  mlp_ratio=8., drop=0.0, drop_path=0.0, spatio_kernel_enc=3,
@@ -213,6 +225,12 @@ class SimVP_Model(nn.Module):
         Y = checkpoint(lambda a, b: self.dec(a, b), hid, skip, use_reentrant=False) if use_ckpt else self.dec(hid, skip)
         Y = Y.view(B, T, C, H, W)
         return Y
+
+
+# Manuscript-facing model alias. The OpenSTL experiment interface keeps using
+# SimVP_Model internally; SFDRNet is the public name used by the manuscript.
+SFDRNet = SimVP_Model
+
 
 # ---------- 8. Sampling control ----------
 def sampling_generator(N, reverse=False):
