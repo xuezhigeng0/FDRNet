@@ -15,6 +15,6 @@ from .base_data import BaseDataModule
 
 __all__ = [
     'KittiCaltechDataset', 'HumanDataset', 'KTHDataset', 'MovingMNIST', 'TaxibjDataset',
-    'WeatherBenchDataset', 'SEVIRDataset'
+    'WeatherBenchDataset', 'SEVIRDataset',
     'load_data', 'dataset_parameters', 'create_loader', 'BaseDataModule'
 ]
