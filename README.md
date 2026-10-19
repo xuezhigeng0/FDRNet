@@ -119,15 +119,16 @@ The script checks both configs, dataset registrations, parameter counts, state-d
 
 ## Implementation Mapping
 
-Historical class names remain in the code for checkpoint compatibility.
+The public code names now match the manuscript terminology exactly. Historical implementation
+class and attribute names are retained only for checkpoint and code compatibility.
 
-| Manuscript component | Code implementation | Location |
-|---|---|---|
-| SFDRNet | `SimVP_Model` with `model_type="vit"` and the OpenSTL `SimVP` method | `openstl/models/simvp_model.py`; `openstl/methods/simvp.py` |
-| Statistics-guided Dynamic Spectral Extractor (SDSE) | `SFFE` in the encoder and decoder | `openstl/models/simvp_model.py` |
-| Statistics-guided ODE Differential Pyramid (SODP) | `MDP` with `MultiStepODEFusion2D` | `openstl/modules/simvp_modules.py` |
-| Gated Multi-order Projected Interaction (GMPI) | `MPA` with `MPABlock` | `openstl/modules/simvp_modules.py` |
-| Frequency-Dynamic Residual Refinement (FDRR) | `FreqBandResidualMix`, used by `ViTSubBlock` | `openstl/modules/simvp_modules.py` |
+| Manuscript component | Public code name | Historical implementation | Location |
+|---|---|---|---|
+| SFDRNet | `SFDRNet` | alias of `SimVP_Model` with `model_type="vit"` through the OpenSTL `SimVP` method | `openstl/models/simvp_model.py`; `openstl/methods/simvp.py` |
+| Statistics-guided Dynamic Spectral Extractor (SDSE) | `SDSE` | alias of `SFFE`, used in the encoder and decoder | `openstl/models/simvp_model.py` |
+| Statistics-guided ODE Differential Pyramid (SODP) | `SODP` | alias of `MDP` with `MultiStepODEFusion2D` | `openstl/modules/simvp_modules.py` |
+| Gated Multi-order Projected Interaction (GMPI) | `GMPI` | alias of `MPA` with `MPABlock` | `openstl/modules/simvp_modules.py` |
+| Frequency-Dynamic Residual Refinement (FDRR) | `FDRR` | alias of `FreqBandResidualMix`, used by `ViTSubBlock` | `openstl/modules/simvp_modules.py` |
 
 ## Compatibility Notes
 
@@ -138,7 +139,7 @@ method = "SimVP"
 model_type = "vit"
 ```
 
-These values select the SFDRNet implementation in this repository; they do not identify vanilla SimVP as SFDRNet. Early experiment records may use **SimVP-TRF3**. SimVP-TRF3 and SFDRNet refer to the same model. Existing model class names, parameter names, and tensor shapes are retained.
+These values select the SFDRNet implementation in this repository; they do not identify vanilla SimVP as SFDRNet. Early experiment records may use **SimVP-TRF3**. SimVP-TRF3 and SFDRNet refer to the same model. Existing historical class/attribute names, parameter names, and tensor shapes are retained. The manuscript-facing aliases `SFDRNet`, `SDSE`, `SODP`, `GMPI`, and `FDRR` point to the same implementation classes and do not change checkpoint keys.
 
 Under either released configuration, the model has 1,533,606 parameters and 504 state-dictionary entries.
 
