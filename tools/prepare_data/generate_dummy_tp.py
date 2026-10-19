@@ -75,6 +75,12 @@ def main() -> None:
         default=48,
         help="Number of hourly frames generated for each year.",
     )
+    parser.add_argument(
+        "--resolution",
+        choices=("5.625", "2.8125"),
+        default="5.625",
+        help="Grid resolution in degrees (default: 5.625).",
+    )
     args = parser.parse_args()
 
     if args.hours_per_year < 25:
@@ -89,18 +95,11 @@ def main() -> None:
     )
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    latitudes = np.linspace(
-        87.1875,
-        -87.1875,
-        32,
-        dtype=np.float32,
-    )
-    longitudes = np.linspace(
-        0.0,
-        354.375,
-        64,
-        dtype=np.float32,
-    )
+    grid_shapes = {"5.625": (32, 64), "2.8125": (64, 128)}
+    n_lat, n_lon = grid_shapes[args.resolution]
+    resolution = float(args.resolution)
+    latitudes = 90.0 - resolution / 2 - resolution * np.arange(n_lat, dtype=np.float32)
+    longitudes = resolution * np.arange(n_lon, dtype=np.float32)
 
     for year in range(2010, 2019):
         times = pd.date_range(
@@ -140,7 +139,7 @@ def main() -> None:
         )
 
         output_path = output_dir / (
-            f"total_precipitation_{year}_5.625deg.nc"
+            f"total_precipitation_{year}_{args.resolution}deg.nc"
         )
         dataset.to_netcdf(output_path)
         dataset.close()
@@ -152,3 +151,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

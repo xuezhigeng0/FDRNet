@@ -27,9 +27,8 @@ class SFFE(nn.Module):
         self.scale_weights = nn.Parameter(torch.ones(n_bands))
         self.alpha = nn.Parameter(torch.tensor(0.5))
 
-        # ---- Innovation-2 (SFFE): Dynamic Cross-Scale Spectral Fusion (DCSF) ----
-        # per-sample dynamic re-weighting over frequency bands + dynamic conv/freq blending
-        # gates are initialized to 0 so the module starts as the original Innovation-1 behavior.
+        # Per-sample band reweighting and dynamic convolution/frequency blending.
+        # Zero-initialized gates preserve the base blend at initialization.
         self.dcsf_scale_gate = nn.Parameter(torch.zeros(1))
         self.dcsf_alpha_gate = nn.Parameter(torch.zeros(1))
 
@@ -107,7 +106,7 @@ class SFFE(nn.Module):
         # DCSF: per-sample dynamic conv/freq blending (starts as scalar alpha)
         dcsf_in = torch.log1p(band_energy)
         alpha_gate = torch.tanh(self.dcsf_alpha_gate)  # scalar in [-1,1], 0 at init
-        alpha_base = self.alpha.clamp(0.0, 1.0)       # keep Innovation-1 behavior at init
+        alpha_base = self.alpha.clamp(0.0, 1.0)       # base blend at initialization
         alpha_delta = torch.tanh(self.dcsf_alpha_mlp(dcsf_in)).squeeze(-1)  # (B,), [-1,1]
         alpha_val = (alpha_base + 0.25 * alpha_gate * alpha_delta).clamp(0.0, 1.0).view(B, 1, 1)
         fused_raw = [alpha_val * c + (1 - alpha_val) * f for c, f in zip(conv_bands, freq_bands)]
@@ -370,15 +369,12 @@ class MidMetaNet(nn.Module):
 
     def forward(self, x):
         B, T, C, H, W = x.shape
-        #print("x", x.shape)
         x = x.reshape(B, T*C, H, W)
-        #print("x,met", x.shape)
         z = x
 
         for i in range(self.N2):
-            #print("z before",z.shape)
             z = self.enc[i](z)
-            #print("z after",z.shape)
 
         y = z.reshape(B, T, C, H, W)
         return y
+

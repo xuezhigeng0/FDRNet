@@ -8,4 +8,5 @@ python tools/train.py \
   --config_file configs/weather/tp_5_625/SFDRNet.py \
   --data_root "${DATA_ROOT}" \
   --res_dir work_dirs \
-  --ex_name SFDRNet
+  --ex_name SFDRNet_tp_5_625
+

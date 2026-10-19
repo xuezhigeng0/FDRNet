@@ -231,5 +231,16 @@ dataset_parameters = {
         'test_time': ['2017', '2018'],
         'metrics': ['mse', 'rmse', 'mae', 'psnr', 'snr'],
     },
+    'weather_tp_2_8125': {
+        'in_shape': [12, 1, 64, 128],
+        'pre_seq_length': 12,
+        'aft_seq_length': 12,
+        'total_length': 24,
+        'data_name': 'tp',
+        'train_time': ['2010', '2015'],
+        'val_time': ['2016', '2016'],
+        'test_time': ['2017', '2018'],
+        'metrics': ['mse', 'rmse', 'mae', 'psnr', 'snr'],
+    },
 
 }

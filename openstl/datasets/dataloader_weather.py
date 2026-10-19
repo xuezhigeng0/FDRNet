@@ -154,9 +154,15 @@ class WeatherBenchDataset(Dataset):
 
     def _load_data_xarray(self, data_name, levels):
         """Loading full data with xarray"""
+        filename_pattern = '{}*.nc'.format(data_map[data_name])
+        if data_name == 'tp':
+            # Keep precipitation resolutions separate when they share a weather root.
+            filename_pattern = '{}*_{}deg.nc'.format(
+                data_map[data_name], self.data_split.replace('_', '.'))
         try:
-            dataset = xr.open_mfdataset(self.data_root+'/{}/{}*.nc'.format(
-                data_map[data_name], data_map[data_name]), combine='by_coords')
+            dataset = xr.open_mfdataset(
+                osp.join(self.data_root, data_map[data_name], filename_pattern),
+                combine='by_coords')
         except (AttributeError, ValueError):
             assert False and 'Please install xarray and its dependency (e.g., netcdf4), ' \
                                 'pip install xarray==0.19.0,' \
@@ -181,6 +187,11 @@ class WeatherBenchDataset(Dataset):
             data = dataset.get(data_keys_map[data_name]).values
         else:
             data = dataset.get(data_name).values
+
+        if data_name == 'tp' and data.shape[-2:] != self.shape:
+            raise ValueError(
+                f'Expected tp grid {self.shape} for {self.data_split}, '
+                f'got {data.shape[-2:]}')
 
         mean = data.mean().reshape(1, 1, 1, 1)
         std = data.std().reshape(1, 1, 1, 1)
@@ -332,3 +343,4 @@ if __name__ == '__main__':
         for item in dataloader_test:
             print('test', item[0].shape)
             break
+
