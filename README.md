@@ -1,6 +1,6 @@
 # SFDRNet
 
-**Spatiotemporal-Frequency Differential and Frequency-Dynamic Residual Network for Sparse Precipitation Image Sequence Prediction**
+**SFDRNet: Spatiotemporal-Frequency Differential Learning for Sparse Precipitation Image Sequence Prediction**
 
 This repository is the official PyTorch implementation of SFDRNet for sparse precipitation image sequence prediction on WeatherBench total precipitation (`tp`). It builds on OpenSTL and uses its SimVP experiment interface; vanilla SimVP is a separate model.
 
@@ -154,7 +154,7 @@ These are reported manuscript results, not automatically reproduced measurements
 
 ## Citation
 
-If you use this repository, please cite the corresponding SFDRNet manuscript: “Spatiotemporal-Frequency Differential and Frequency-Dynamic Residual Network for Sparse Precipitation Image Sequence Prediction.” A full BibTeX entry can be added after publication.
+If you use this repository, please cite the corresponding SFDRNet manuscript: “SFDRNet: Spatiotemporal-Frequency Differential Learning for Sparse Precipitation Image Sequence Prediction.” A full BibTeX entry can be added after publication.
 
 ## Acknowledgements and License
 
